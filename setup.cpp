@@ -91,6 +91,7 @@ vector<Node*> generateChildren(Node* current, const vector<vector<int>>& goal, s
 
             int new_h = (heuristic == "h1") ? h1(new_state, goal) : h2(new_state, goal);
 
+            // assign each child a f (n) -value. -- This is done in constructor of Node 
             Node* child = new Node(new_state, current->g + 1, new_h, current);
             children.push_back(child);
         }
@@ -101,8 +102,8 @@ vector<Node*> generateChildren(Node* current, const vector<vector<int>>& goal, s
 // A* search algorithm
 vector<vector<vector<int>>> AStarSearch(const vector<vector<int>>& initial, const vector<vector<int>>& goal, string heuristic) {
 
-    priority_queue<pair<int, Node*>, vector<pair<int, Node*>>, greater<pair<int, Node*>>> open;
-    vector<Node*> all_nodes; // To free memory later
+    priority_queue<pair<int, Node*>, vector<pair<int, Node*>>, greater<pair<int, Node*>>> open; // Make sure this takes the node with the lowest f value
+    vector<Node*> all_nodes; // To free memory & count nodes generated
 
     int h_root = (heuristic == "h1") ? h1(initial, goal) : h2(initial, goal);
     Node* root = new Node(initial, 0, h_root);
@@ -114,8 +115,10 @@ vector<vector<vector<int>>> AStarSearch(const vector<vector<int>>& initial, cons
         Node* current = open.top().second;
         open.pop();
 
+        // if X = goal then return the path from Start to X
         if (current->state == goal) {
 
+            
             vector<vector<vector<int>>> path;
             while (current != nullptr) {
                 path.push_back(current->state);
@@ -129,7 +132,11 @@ vector<vector<vector<int>>> AStarSearch(const vector<vector<int>>& initial, cons
             return path;
         }
 
+        // generate children of X.
         vector<Node*> children = generateChildren(current, goal, heuristic);
+
+        // discard children of X if already on open or closed. 
+
         for (Node* child : children) {
             open.emplace(child->f, child);
             all_nodes.push_back(child);
