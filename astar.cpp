@@ -1,5 +1,5 @@
-// g++ -o setup.exe setup.cpp
-// ./setup
+// g++ -o astar.exe astar.cpp
+// ./astar
 #include <iostream>
 #include <bits/stdc++.h>
 
@@ -101,72 +101,74 @@ vector<Node*> generateChildren(Node* current, const vector<vector<int>>& goal, s
 
 // A* search algorithm
 vector<vector<vector<int>>> AStarSearch(const vector<vector<int>>& initial, const vector<vector<int>>& goal, string heuristic) {
+    try {
+        priority_queue<pair<int, Node*>, vector<pair<int, Node*>>, greater<pair<int, Node*>>> open; // Make sure this takes the node with the lowest f value
+        int nodesExpanded = 0, nodesGenerated = 1;
 
-    priority_queue<pair<int, Node*>, vector<pair<int, Node*>>, greater<pair<int, Node*>>> open; // Make sure this takes the node with the lowest f value
-    int nodesExpanded = 0, nodesGenerated = 1;
+        // TO-DO: Change all_nodes to closed  (unordered_set)
+        vector<Node*> all_nodes; // To free memory & count nodes generated
 
-    // TO-DO: Change all_nodes to closed  (unordered_set)
-    vector<Node*> all_nodes; // To free memory & count nodes generated
+        int h_root = (heuristic == "h1") ? h1(initial, goal) : h2(initial, goal);
+        Node* root = new Node(initial, 0, h_root);
 
-    int h_root = (heuristic == "h1") ? h1(initial, goal) : h2(initial, goal);
-    Node* root = new Node(initial, 0, h_root);
+        all_nodes.push_back(root);
+        open.emplace(root->f, root);
 
-    all_nodes.push_back(root);
-    open.emplace(root->f, root);
+        while (!open.empty()) {
+            Node* current = open.top().second;
+            open.pop();
+            nodesExpanded++;
 
-    while (!open.empty()) {
-        Node* current = open.top().second;
-        open.pop();
-        nodesExpanded++;
-
-
-        // if X = goal then return the path from Start to X
-        if (current->state == goal) {
-
-            
-            vector<vector<vector<int>>> path;
-            while (current != nullptr) {
-                path.push_back(current->state);
-                current = current->parent;
-            }
-            reverse(path.begin(), path.end());
-
-            cout << "Path found for " << heuristic << endl;
-            cout << "Nodes generated: " << nodesGenerated << endl;
-            cout << "Nodes expanded: " << nodesExpanded << endl;
-            // Clean up memory
-            for (Node* node : all_nodes) delete node;
-            return path;
-        }
-
-        // generate children of X.
-        vector<Node*> children = generateChildren(current, goal, heuristic);
-
-        for (Node* child : children) {
-            // discard children of X if already on open or closed. 
-            bool skip = false;
-            for (Node* node : all_nodes) {
-                if (node->state == child->state && node->f <= child->f) {
-                    skip = true;
-                    break;
+            // if X = goal then return the path from Start to X
+            if (current->state == goal) {
+                vector<vector<vector<int>>> path;
+                while (current != nullptr) {
+                    path.push_back(current->state);
+                    current = current->parent;
                 }
+                reverse(path.begin(), path.end());
+
+                cout << "Path found for " << heuristic << endl;
+                cout << "Nodes generated: " << nodesGenerated << endl;
+                cout << "Nodes expanded: " << nodesExpanded << endl;
+                // Clean up memory
+                for (Node* node : all_nodes) delete node;
+                return path;
             }
 
-            if (skip) continue;
+            // generate children of X.
+            vector<Node*> children = generateChildren(current, goal, heuristic);
 
-            open.emplace(child->f, child);
+            for (Node* child : children) {
+                // discard children of X if already on open or closed. 
+                bool skip = false;
+                for (Node* node : all_nodes) {
+                    if (node->state == child->state && node->f <= child->f) {
+                        skip = true;
+                        break;
+                    }
+                }
 
-            all_nodes.push_back(child);
-            nodesGenerated++;
+                if (skip) continue;
+
+                open.emplace(child->f, child);
+
+                all_nodes.push_back(child);
+                nodesGenerated++;
+            }
+
+            // add X to closed
         }
 
-        // add X to closed
+        // If no solution found
+        cout << "No solution found for " << heuristic << endl;
+        for (Node* node : all_nodes) delete node;
+        
+    } catch (const exception& e) {
+        cerr << "An error occurred: " << e.what() << endl;
     }
 
-    // If no solution found
-    cout << "No solution found for " << heuristic << endl;
-    for (Node* node : all_nodes) delete node;
-    return {}; // Return empty path
+    return {};
 }
 
 int main()
@@ -193,6 +195,8 @@ int main()
     A sample of such a table is given below. 
     
     Also, provide the total path for each run: */
+    cout << "Press ENTER to continue...";
+    cin.get();
 
     return 0;
 }
