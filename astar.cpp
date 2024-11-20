@@ -1,5 +1,6 @@
 // g++ -o astar.exe astar.cpp
 // ./astar
+// astar.exe
 #include <iostream>
 #include <bits/stdc++.h>
 
@@ -103,7 +104,7 @@ vector<Node*> generateChildren(Node* current, const vector<vector<int>>& goal, s
 vector<vector<vector<int>>> AStarSearch(const vector<vector<int>>& initial, const vector<vector<int>>& goal, string heuristic) {
     try {
         priority_queue<pair<int, Node*>, vector<pair<int, Node*>>, greater<pair<int, Node*>>> open; // Make sure this takes the node with the lowest f value
-        int nodesExpanded = 0, nodesGenerated = 1;
+        int nodesExpanded = 0, nodesGenerated = 1, skipCount = 0;
 
         // TO-DO: Change all_nodes to closed  (unordered_set)
         vector<Node*> all_nodes; // To free memory & count nodes generated
@@ -131,6 +132,8 @@ vector<vector<vector<int>>> AStarSearch(const vector<vector<int>>& initial, cons
                 cout << "Path found for " << heuristic << endl;
                 cout << "Nodes generated: " << nodesGenerated << endl;
                 cout << "Nodes expanded: " << nodesExpanded << endl;
+                cout << "Nodes skipped: " << skipCount << endl;
+                
                 // Clean up memory
                 for (Node* node : all_nodes) delete node;
                 return path;
@@ -145,6 +148,7 @@ vector<vector<vector<int>>> AStarSearch(const vector<vector<int>>& initial, cons
                 for (Node* node : all_nodes) {
                     if (node->state == child->state && node->f <= child->f) {
                         skip = true;
+                        skipCount++;
                         break;
                     }
                 }
@@ -187,6 +191,14 @@ int main()
     path = AStarSearch(init, goal, "h2");
     for (auto& state : path) printState(state);
 
+    cout << "\n\nSecond Initial State Run\n\n" << endl;
+    cout << "Running h1...\n\n" << endl;
+    path = AStarSearch(init2, goal, "h1");
+    for (auto& state : path) printState(state);
+
+    cout << "Running h2...\n\n" << endl;
+    path = AStarSearch(init2, goal, "h2");
+    for (auto& state : path) printState(state);
 
     /*
     For each run print the execution time (ET), the number of nodes generated (NG), 
