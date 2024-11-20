@@ -117,6 +117,7 @@ vector<vector<vector<int>>> AStarSearch(const vector<vector<int>>& initial, cons
     while (!open.empty()) {
         Node* current = open.top().second;
         open.pop();
+        nodesExpanded++;
 
 
         // if X = goal then return the path from Start to X
@@ -130,7 +131,9 @@ vector<vector<vector<int>>> AStarSearch(const vector<vector<int>>& initial, cons
             }
             reverse(path.begin(), path.end());
 
-
+            cout << "Path found for " << heuristic << endl;
+            cout << "Nodes generated: " << nodesGenerated << endl;
+            cout << "Nodes expanded: " << nodesExpanded << endl;
             // Clean up memory
             for (Node* node : all_nodes) delete node;
             return path;
