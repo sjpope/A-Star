@@ -1,5 +1,5 @@
 // g++ -o setup.exe setup.cpp
-
+// ./setup
 #include <iostream>
 #include <bits/stdc++.h>
 
@@ -103,6 +103,9 @@ vector<Node*> generateChildren(Node* current, const vector<vector<int>>& goal, s
 vector<vector<vector<int>>> AStarSearch(const vector<vector<int>>& initial, const vector<vector<int>>& goal, string heuristic) {
 
     priority_queue<pair<int, Node*>, vector<pair<int, Node*>>, greater<pair<int, Node*>>> open; // Make sure this takes the node with the lowest f value
+    int nodesExpanded = 0, nodesGenerated = 1;
+
+    // TO-DO: Change all_nodes to closed  (unordered_set)
     vector<Node*> all_nodes; // To free memory & count nodes generated
 
     int h_root = (heuristic == "h1") ? h1(initial, goal) : h2(initial, goal);
@@ -114,6 +117,7 @@ vector<vector<vector<int>>> AStarSearch(const vector<vector<int>>& initial, cons
     while (!open.empty()) {
         Node* current = open.top().second;
         open.pop();
+
 
         // if X = goal then return the path from Start to X
         if (current->state == goal) {
@@ -135,15 +139,29 @@ vector<vector<vector<int>>> AStarSearch(const vector<vector<int>>& initial, cons
         // generate children of X.
         vector<Node*> children = generateChildren(current, goal, heuristic);
 
-        // discard children of X if already on open or closed. 
-
         for (Node* child : children) {
+            // discard children of X if already on open or closed. 
+            bool skip = false;
+            for (Node* node : all_nodes) {
+                if (node->state == child->state && node->f <= child->f) {
+                    skip = true;
+                    break;
+                }
+            }
+
+            if (skip) continue;
+
             open.emplace(child->f, child);
+
             all_nodes.push_back(child);
+            nodesGenerated++;
         }
+
+        // add X to closed
     }
 
     // If no solution found
+    cout << "No solution found for " << heuristic << endl;
     for (Node* node : all_nodes) delete node;
     return {}; // Return empty path
 }
@@ -151,17 +169,17 @@ vector<vector<vector<int>>> AStarSearch(const vector<vector<int>>& initial, cons
 int main()
 {
 
+    cout << "Welcome to A* Search Simulator\n\n" << endl;
     vector<vector<int>> goal = {{1, 2, 3}, {8, 0, 4}, {7, 6, 5}};
-
     vector<vector<int>> init = {{2, 8, 3}, {1, 6, 4}, {0, 7, 5}};
     vector<vector<int>> init2 = {{2, 1, 6}, {4, 0, 8}, {7, 5, 3}};
 
-
+    cout << "Running h1...\n\n" << endl;
     vector<vector<vector<int>>> path = AStarSearch(init, goal, "h1");
     for (auto& state : path) printState(state);
     
-
-    path = AStarSearch(init2, goal, "h2");
+    cout << "Running h2...\n\n" << endl;
+    path = AStarSearch(init, goal, "h2");
     for (auto& state : path) printState(state);
 
 
