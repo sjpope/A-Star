@@ -3,6 +3,11 @@
 // astar.exe
 #include <iostream>
 #include <bits/stdc++.h>
+#include <windows.h>
+
+#ifndef ENABLE_VIRTUAL_TERMINAL_PROCESSING
+#define ENABLE_VIRTUAL_TERMINAL_PROCESSING 0x0004
+#endif
 
 using namespace std;
 using namespace chrono;
@@ -195,8 +200,6 @@ SearchResult  AStarSearch(const vector<vector<int>>& initial, const vector<vecto
                 return result;
             }
 
-
-
             // generate children of X.
             vector<Node*> children = generateChildren(current, goal, heuristic);
 
@@ -239,7 +242,16 @@ SearchResult  AStarSearch(const vector<vector<int>>& initial, const vector<vecto
 int main()
 {
 
-    cout << "Welcome to A* Search Simulator\n\n" << endl;
+    // Enable virtual terminal processing on Windows 10 to handle ANSI escape sequences
+    HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
+    DWORD consoleMode;
+    GetConsoleMode(hConsole, &consoleMode);
+    consoleMode |= ENABLE_VIRTUAL_TERMINAL_PROCESSING;
+    SetConsoleMode(hConsole, consoleMode);
+
+    // ANSI escape codes
+    cout << "\x1b[1;31m\n\nWelcome to A* Search Simulator\n\n\x1b[0m" << endl;
+    
     vector<vector<int>> goal = {{1, 2, 3}, {8, 0, 4}, {7, 6, 5}};
     vector<vector<int>> init = {{2, 8, 3}, {1, 6, 4}, {0, 7, 5}};
     vector<vector<int>> init2 = {{2, 1, 6}, {4, 0, 8}, {7, 5, 3}};
