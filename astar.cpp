@@ -5,6 +5,25 @@
 #include <bits/stdc++.h>
 
 using namespace std;
+using namespace chrono;
+
+int nodesExpanded = 0, nodesGenerated = 1, skipCount = 0;
+milliseconds duration = 0ms;
+
+struct Metrics {
+    string heuristic;
+    long ET; // Execution time in milliseconds
+    int NG;  // Nodes generated
+    int NE;  // Nodes expanded
+    int D;   // Depth of the tree
+    double b_star; // Effective branching factor
+};
+
+// Struct to store the search result and associated metrics
+struct SearchResult {
+    vector<vector<vector<int>>> path;
+    Metrics metrics;
+};
 
 struct Node {
     vector<vector<int>> state;
@@ -19,13 +38,28 @@ struct Node {
     }
 };
 
+struct vector_hash {
+    // Overloads the function call operator to allow instances of vector_hash to be used as hash functions for vector<vector<int>>
+    size_t operator()(const vector<vector<int>>& v) const {
+        hash<int> hasher; 
+        size_t seed = 0; 
+
+        for (auto& i : v) {
+            for (int j : i) {
+                seed ^= hasher(j) + 0x9e3779b9 + (seed << 6) + (seed >> 2); // Combines the hash of the current element with the seed using bitwise operations and a constant to ensure a good distribution of hash values.
+            }
+        }
+
+        return seed;
+    }
+};
 void printState(vector<vector<int>> state);
 
 int h1(vector<vector<int>> state, vector<vector<int>> goal){
     // Number of misplaced tiles
     int count = 0;
-    for (int i = 0; i < state.size(); i++) {
-        for (int j = 0; j < state[i].size(); j++) {
+    for (size_t i = 0; i < state.size(); i++) {
+        for (size_t j = 0; j < state[i].size(); j++) {
             if (state[i][j] != goal[i][j]) {
                 count++;
             }
@@ -36,13 +70,13 @@ int h1(vector<vector<int>> state, vector<vector<int>> goal){
 int h2(vector<vector<int>> state, vector<vector<int>> goal){
     // Sum of distances of tiles from their goal positions
     int sum = 0;
-    for (int i = 0; i < state.size(); i++) {
-        for (int j = 0; j < state[i].size(); j++) {
+    for (size_t i = 0; i < state.size(); i++) {
+        for (size_t j = 0; j < state[i].size(); j++) {
             int num = state[i][j];
             if (num != 0) {
-                int goal_x, goal_y;
-                for (int x = 0; x < goal.size(); x++) {
-                    for (int y = 0; y < goal[x].size(); y++) {
+                size_t goal_x, goal_y;
+                for (size_t x = 0; x < goal.size(); x++) {
+                    for (size_t y = 0; y < goal[x].size(); y++) {
                         if (goal[x][y] == num) {
                             goal_x = x;
                             goal_y = y;
@@ -50,7 +84,7 @@ int h2(vector<vector<int>> state, vector<vector<int>> goal){
                         }
                     }
                 }
-                sum += abs(i - goal_x) + abs(j - goal_y);
+                sum += abs(static_cast<int>(i) - static_cast<int>(goal_x)) + abs(static_cast<int>(j) - static_cast<int>(goal_y));
             }
         }
     }
@@ -101,13 +135,19 @@ vector<Node*> generateChildren(Node* current, const vector<vector<int>>& goal, s
 }
 
 // A* search algorithm
-vector<vector<vector<int>>> AStarSearch(const vector<vector<int>>& initial, const vector<vector<int>>& goal, string heuristic) {
+SearchResult  AStarSearch(const vector<vector<int>>& initial, const vector<vector<int>>& goal, string heuristic) {
+    auto start = high_resolution_clock::now();
+
+    SearchResult result;
+    vector<vector<vector<int>>> path;
+    Metrics metrics;
+
     try {
         priority_queue<pair<int, Node*>, vector<pair<int, Node*>>, greater<pair<int, Node*>>> open; // Make sure this takes the node with the lowest f value
+        
+        unordered_set<vector<vector<int>>, vector_hash> closed;
+        vector<Node*> all_nodes;
         int nodesExpanded = 0, nodesGenerated = 1, skipCount = 0;
-
-        // TO-DO: Change all_nodes to closed  (unordered_set)
-        vector<Node*> all_nodes; // To free memory & count nodes generated
 
         int h_root = (heuristic == "h1") ? h1(initial, goal) : h2(initial, goal);
         Node* root = new Node(initial, 0, h_root);
@@ -122,7 +162,20 @@ vector<vector<vector<int>>> AStarSearch(const vector<vector<int>>& initial, cons
 
             // if X = goal then return the path from Start to X
             if (current->state == goal) {
-                vector<vector<vector<int>>> path;
+                auto end = high_resolution_clock::now();
+                long ET = duration_cast<milliseconds>(end - start).count();
+
+                int D = current->g; // Depth of the tree
+                double b_star = static_cast<double>(nodesGenerated) / D; // Effective branching factor
+
+                // Populate metrics
+                metrics.heuristic = heuristic;
+                metrics.ET = ET;
+                metrics.NG = nodesGenerated;
+                metrics.NE = nodesExpanded;
+                metrics.D = D;
+                metrics.b_star = b_star;
+
                 while (current != nullptr) {
                     path.push_back(current->state);
                     current = current->parent;
@@ -133,35 +186,41 @@ vector<vector<vector<int>>> AStarSearch(const vector<vector<int>>& initial, cons
                 cout << "Nodes generated: " << nodesGenerated << endl;
                 cout << "Nodes expanded: " << nodesExpanded << endl;
                 cout << "Nodes skipped: " << skipCount << endl;
-                
+
                 // Clean up memory
                 for (Node* node : all_nodes) delete node;
-                return path;
+
+                result.path = path;
+                result.metrics = metrics;
+                return result;
             }
+
+
 
             // generate children of X.
             vector<Node*> children = generateChildren(current, goal, heuristic);
 
             for (Node* child : children) {
+
                 // discard children of X if already on open or closed. 
-                bool skip = false;
-                for (Node* node : all_nodes) {
-                    if (node->state == child->state && node->f <= child->f) {
-                        skip = true;
-                        skipCount++;
-                        break;
-                    }
+                if (current->parent != nullptr && child->state == current->parent->state) {
+                    skipCount++;
+                    delete child;
+                    continue;
                 }
 
-                if (skip) continue;
-
+                if (closed.find(child->state) != closed.end()) {
+                    skipCount++;
+                    delete child;
+                    continue;
+                } 
+                
                 open.emplace(child->f, child);
-
                 all_nodes.push_back(child);
                 nodesGenerated++;
             }
 
-            // add X to closed
+            closed.insert(current->state);
         }
 
         // If no solution found
@@ -172,7 +231,9 @@ vector<vector<vector<int>>> AStarSearch(const vector<vector<int>>& initial, cons
         cerr << "An error occurred: " << e.what() << endl;
     }
 
-    return {};
+    result.path = {};
+    result.metrics = metrics;
+    return result;
 }
 
 int main()
@@ -183,37 +244,70 @@ int main()
     vector<vector<int>> init = {{2, 8, 3}, {1, 6, 4}, {0, 7, 5}};
     vector<vector<int>> init2 = {{2, 1, 6}, {4, 0, 8}, {7, 5, 3}};
 
-    cout << "Running h1...\n\n" << endl;
-    vector<vector<vector<int>>> path = AStarSearch(init, goal, "h1");
-    for (auto& state : path) printState(state);
-    
-    cout << "Running h2...\n\n" << endl;
-    path = AStarSearch(init, goal, "h2");
-    for (auto& state : path) printState(state);
+    vector<SearchResult> results_init1;
+    vector<SearchResult> results_init2;
 
+
+    // First initial state runs
+    cout << "Running h1...\n\n" << endl;
+    SearchResult result = AStarSearch(init, goal, "h1");
+    results_init1.push_back(result);
+    for (auto& state : result.path) printState(state);
+
+    cout << "Running h2...\n\n" << endl;
+    result = AStarSearch(init, goal, "h2");
+    results_init1.push_back(result);
+    for (auto& state : result.path) printState(state);
+
+
+    // Second initial state runs
     cout << "\n\nSecond Initial State Run\n\n" << endl;
     cout << "Running h1...\n\n" << endl;
-    path = AStarSearch(init2, goal, "h1");
-    for (auto& state : path) printState(state);
+    result = AStarSearch(init2, goal, "h1");
+    results_init2.push_back(result);
+    for (auto& state : result.path) printState(state);
 
     cout << "Running h2...\n\n" << endl;
-    path = AStarSearch(init2, goal, "h2");
-    for (auto& state : path) printState(state);
+    result = AStarSearch(init2, goal, "h2");
+    results_init2.push_back(result);
+    for (auto& state : result.path) printState(state);
 
-    /*
-    For each run print the execution time (ET), the number of nodes generated (NG), 
-    the number of nodes expanded (NE), depth of the tree (D), and the effective branching factor b* (NG/D).  
-    Tabulate this data in two tables, one for each initial state.  
-    A sample of such a table is given below. 
-    
-    Also, provide the total path for each run: */
-    cout << "Press ENTER to continue...";
+
+    // Print tables for initial state #1
+    cout << "\n\nTable 1\n" << endl;
+    cout << "Initial State #1:\n" << endl;
+    cout << "Heuristic Function\tET (ms)\tNG\tNE\tD\tb*" << endl;
+
+    for (auto& res : results_init1) {
+        cout << res.metrics.heuristic << "\t\t\t"
+             << res.metrics.ET << "\t"
+             << res.metrics.NG << "\t"
+             << res.metrics.NE << "\t"
+             << res.metrics.D << "\t"
+             << res.metrics.b_star << endl;
+    }
+
+
+    // Print tables for initial state #2
+    cout << "\n\nTable 2\n" << endl;
+    cout << "Initial State #2:\n" << endl;
+    cout << "Heuristic Function\tET (ms)\tNG\tNE\tD\tb*" << endl;
+
+    for (auto& res : results_init2) {
+        cout << res.metrics.heuristic << "\t\t\t"
+             << res.metrics.ET << "\t"
+             << res.metrics.NG << "\t"
+             << res.metrics.NE << "\t"
+             << res.metrics.D << "\t"
+             << res.metrics.b_star << endl;
+    }
+
+    cout << "\nPress ENTER to continue...";
     cin.get();
 
     return 0;
 }
 
-// Need a closed list to avoid revisiting nodes
 
 void printState(vector<vector<int>> state) {
 
