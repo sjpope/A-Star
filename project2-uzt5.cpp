@@ -45,6 +45,9 @@ struct Node {
 
 struct vector_hash {
     // Overloads the function call operator to allow instances of vector_hash to be used as hash functions for vector<vector<int>>
+    
+    // This is a hash function for a vector<vector<int>>. It is used to hash the state of a node so that it can be stored in an unordered_set.
+    // unordered_set<vector<vector<int>>, vector_hash> closed;
     size_t operator()(const vector<vector<int>>& v) const {
         hash<int> hasher; 
         size_t seed = 0; 
@@ -159,6 +162,8 @@ int h3(vector<vector<int>> state, vector<vector<int>> goal){
 }
 
 int h4(const vector<vector<int>>& state, const vector<vector<int>>& goal) {
+    // Manhattan distance + Sequence Score
+    
     int manhattan = 0;
     int sequence_score = 0;
     int size = state.size();
