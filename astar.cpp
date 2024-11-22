@@ -13,11 +13,11 @@ using namespace std;
 using namespace chrono;
 
 int nodesExpanded = 0, nodesGenerated = 1, skipCount = 0;
-milliseconds duration = 0ms;
+// milliseconds duration = 0ms;
 
 struct Metrics {
     string heuristic;
-    long ET; // Execution time in milliseconds
+    double ET; // Execution time in milliseconds
     int NG;  // Nodes generated
     int NE;  // Nodes expanded
     int D;   // Depth of the tree
@@ -58,7 +58,16 @@ struct vector_hash {
         return seed;
     }
 };
-void printState(vector<vector<int>> state);
+
+void printState(vector<vector<int>> state){
+    for (size_t i = 0; i < state.size(); i++) {
+        for (size_t j = 0; j < state[i].size(); j++) {
+            cout << state[i][j] << " ";
+        }
+        cout << endl;
+    }
+    cout << endl;
+}
 
 int h1(vector<vector<int>> state, vector<vector<int>> goal){
     // Number of misplaced tiles
@@ -73,7 +82,7 @@ int h1(vector<vector<int>> state, vector<vector<int>> goal){
 }
 
 int h2(vector<vector<int>> state, vector<vector<int>> goal){
-    // Sum of distances of tiles from their goal positions
+    // Sum of distances of tiles from their goal positions (Manhattan distance)
     int sum = 0;
     for (size_t i = 0; i < state.size(); i++) {
         for (size_t j = 0; j < state[i].size(); j++) {
@@ -95,19 +104,67 @@ int h2(vector<vector<int>> state, vector<vector<int>> goal){
     }
 }
 
-// Sam's heuristic - Euclidean distance
-int h3(vector<vector<int>> state, vector<vector<int>> goal);
+int h3(vector<vector<int>> state, vector<vector<int>> goal){
+    // Linear Conflict
+    int manhattan = 0;
+    int linear_conflict = 0;
+    int size = state.size();
 
-// Landry's heuristic
-int h4(vector<vector<int>> state, vector<vector<int>> goal);
+    // Create goal position maps for quick lookup
+    unordered_map<int, pair<int, int>> goal_positions;
+    for (size_t i = 0; i < size; ++i) {
+        for (size_t j = 0; j < size; ++j) {
+            goal_positions[goal[i][j]] = {i, j};
+        }
+    }
+
+    // Compute Manhattan distance and detect linear conflicts
+    for (int i = 0; i < size; ++i) {
+        // Rows
+        for (int j = 0; j < size; ++j) {
+            int tile = state[i][j];
+            if (tile != 0) {
+                int goal_i = goal_positions[tile].first;
+                int goal_j = goal_positions[tile].second;
+                manhattan += abs(i - goal_i) + abs(j - goal_j);
+
+                // Check for row conflicts
+                if (i == goal_i) {
+                    for (int k = j + 1; k < size; ++k) {
+                        int other_tile = state[i][k];
+                        if (other_tile != 0 && goal_positions[other_tile].first == i) {
+                            if (goal_positions[other_tile].second < goal_j) {
+                                linear_conflict += 2;
+                            }
+                        }
+                    }
+                }
+
+                // Check for column conflicts
+                if (j == goal_j) {
+                    for (int k = i + 1; k < size; ++k) {
+                        int other_tile = state[k][j];
+                        if (other_tile != 0 && goal_positions[other_tile].second == j) {
+                            if (goal_positions[other_tile].first < goal_i) {
+                                linear_conflict += 2;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    return manhattan + linear_conflict;
+}
 
 vector<Node*> generateChildren(Node* current, const vector<vector<int>>& goal, string heuristic) {
 
     vector<Node*> children;
-    int zero_x, zero_y;
+    size_t zero_x, zero_y;
     // Find the zero (empty space) in the puzzle
-    for (int i = 0; i < 3; i++) {
-        for (int j = 0; j < 3; j++) {
+    for (size_t i = 0; i < 3; i++) {
+        for (size_t j = 0; j < 3; j++) {
             if (current->state[i][j] == 0) {
                 zero_x = i;
                 zero_y = j;
@@ -121,15 +178,15 @@ vector<Node*> generateChildren(Node* current, const vector<vector<int>>& goal, s
 
     for (auto& dir : directions) {
 
-        int new_x = zero_x + dir.first;
-        int new_y = zero_y + dir.second;
+        size_t new_x = zero_x + dir.first;
+        size_t new_y = zero_y + dir.second;
 
         if (new_x >= 0 && new_x < 3 && new_y >= 0 && new_y < 3) {
 
             vector<vector<int>> new_state = current->state;
             swap(new_state[zero_x][zero_y], new_state[new_x][new_y]);
 
-            int new_h = (heuristic == "h1") ? h1(new_state, goal) : h2(new_state, goal);
+            int new_h = (heuristic == "h1") ? h1(new_state, goal) : (heuristic == "h2") ? h2(new_state, goal) : h3(new_state, goal);
 
             // assign each child a f (n) -value. -- This is done in constructor of Node 
             Node* child = new Node(new_state, current->g + 1, new_h, current);
@@ -139,7 +196,6 @@ vector<Node*> generateChildren(Node* current, const vector<vector<int>>& goal, s
     return children;
 }
 
-// A* search algorithm
 SearchResult  AStarSearch(const vector<vector<int>>& initial, const vector<vector<int>>& goal, string heuristic) {
     auto start = high_resolution_clock::now();
 
@@ -154,7 +210,7 @@ SearchResult  AStarSearch(const vector<vector<int>>& initial, const vector<vecto
         vector<Node*> all_nodes;
         int nodesExpanded = 0, nodesGenerated = 1, skipCount = 0;
 
-        int h_root = (heuristic == "h1") ? h1(initial, goal) : h2(initial, goal);
+        int h_root = (heuristic == "h1") ? h1(initial, goal) : (heuristic == "h2") ? h2(initial, goal) : h3(initial, goal);
         Node* root = new Node(initial, 0, h_root);
 
         all_nodes.push_back(root);
@@ -168,7 +224,10 @@ SearchResult  AStarSearch(const vector<vector<int>>& initial, const vector<vecto
             // if X = goal then return the path from Start to X
             if (current->state == goal) {
                 auto end = high_resolution_clock::now();
-                long ET = duration_cast<milliseconds>(end - start).count();
+                // milliseconds ET = duration_cast<milliseconds>(end - start);
+
+                duration<double> elapsed_seconds = end - start;
+                double ET = duration<double, std::milli>(end - start).count();
 
                 int D = current->g; // Depth of the tree
                 double b_star = static_cast<double>(nodesGenerated) / D; // Effective branching factor
@@ -241,7 +300,6 @@ SearchResult  AStarSearch(const vector<vector<int>>& initial, const vector<vecto
 
 int main()
 {
-
     // Enable virtual terminal processing on Windows 10 to handle ANSI escape sequences
     HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
     DWORD consoleMode;
@@ -251,14 +309,15 @@ int main()
 
     // ANSI escape codes
     cout << "\x1b[1;31m\n\nWelcome to A* Search Simulator\n\n\x1b[0m" << endl;
-    
-    vector<vector<int>> goal = {{1, 2, 3}, {8, 0, 4}, {7, 6, 5}};
+    bool run = true;
+    while(run){
+
+        vector<vector<int>> goal = {{1, 2, 3}, {8, 0, 4}, {7, 6, 5}};
     vector<vector<int>> init = {{2, 8, 3}, {1, 6, 4}, {0, 7, 5}};
     vector<vector<int>> init2 = {{2, 1, 6}, {4, 0, 8}, {7, 5, 3}};
 
     vector<SearchResult> results_init1;
     vector<SearchResult> results_init2;
-
 
     // First initial state runs
     cout << "Running h1...\n\n" << endl;
@@ -271,6 +330,10 @@ int main()
     results_init1.push_back(result);
     for (auto& state : result.path) printState(state);
 
+    cout << "Running h3...\n\n" << endl;
+    result = AStarSearch(init, goal, "h3");
+    results_init1.push_back(result);
+    for (auto& state : result.path) printState(state);
 
     // Second initial state runs
     cout << "\n\nSecond Initial State Run\n\n" << endl;
@@ -284,6 +347,10 @@ int main()
     results_init2.push_back(result);
     for (auto& state : result.path) printState(state);
 
+    cout << "Running h3...\n\n" << endl;
+    result = AStarSearch(init2, goal, "h3");
+    results_init2.push_back(result);
+    for (auto& state : result.path) printState(state);
 
     // Print tables for initial state #1
     cout << "\n\nTable 1\n" << endl;
@@ -314,20 +381,18 @@ int main()
              << res.metrics.b_star << endl;
     }
 
-    cout << "\nPress ENTER to continue...";
-    cin.get();
+        cout << "\nPress ENTER to run again. Press Q to quit...";
+        string userInput;
+        cin.get();
+        getline(cin, userInput);
+        if (userInput == "Q" || userInput == "q") {
+            cout << "Exiting..." << endl;
+            run = false;
+        }
+    }
 
     return 0;
 }
 
 
-void printState(vector<vector<int>> state) {
 
-    for (int i = 0; i < state.size(); i++) {
-        for (int j = 0; j < state[i].size(); j++) {
-            cout << state[i][j] << " ";
-        }
-        cout << endl;
-    }
-    cout << endl;
-}
