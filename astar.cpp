@@ -158,6 +158,75 @@ int h3(vector<vector<int>> state, vector<vector<int>> goal){
     return manhattan + linear_conflict;
 }
 
+int h4(const vector<vector<int>>& state, const vector<vector<int>>& goal) {
+    int manhattan = 0;
+    int sequence_score = 0;
+    int size = state.size();
+
+    // Goal sequence for the perimeter tiles
+    vector<int> goal_sequence = {1, 2, 3, 4, 5, 6, 7, 8};
+
+    // Create a map for goal positions
+    unordered_map<int, pair<int, int>> goal_positions;
+    for (int i = 0; i < size; ++i) {
+        for (int j = 0; j < size; ++j) {
+            goal_positions[goal[i][j]] = {i, j};
+        }
+    }
+
+    // Calculate Manhattan distance
+    for (int i = 0; i < size; ++i) {
+        for (int j = 0; j < size; ++j) {
+            int tile = state[i][j];
+            if (tile != 0) {
+                int goal_i = goal_positions[tile].first;
+                int goal_j = goal_positions[tile].second;
+                manhattan += abs(i - goal_i) + abs(j - goal_j);
+            }
+        }
+    }
+
+    // Calculate Sequence Score
+    // Define the positions in the order to check
+    vector<pair<int, int>> positions = {
+        {0, 0}, {0, 1}, {0, 2},
+        {1, 2}, {2, 2}, {2, 1},
+        {2, 0}, {1, 0}, {0, 0} // Return to the start for the sequence
+    };
+
+    for (int k = 0; k < positions.size() - 1; ++k) {
+        int i1 = positions[k].first;
+        int j1 = positions[k].second;
+        int i2 = positions[k + 1].first;
+        int j2 = positions[k + 1].second;
+
+        int tile1 = state[i1][j1];
+        int tile2 = state[i2][j2];
+
+        // For the empty tile, treat it as 9 (since 0 is the empty tile)
+        if (tile1 == 0) tile1 = 9;
+        if (tile2 == 0) tile2 = 9;
+
+        // Find the expected successor of tile1
+        auto it = find(goal_sequence.begin(), goal_sequence.end(), tile1);
+        if (it != goal_sequence.end()) {
+            auto next_it = next(it);
+            if (next_it == goal_sequence.end()) next_it = goal_sequence.begin(); // Loop back to start
+            int expected_successor = *next_it;
+            if (expected_successor != tile2) {
+                sequence_score += 2;
+            }
+        }
+    }
+
+    // Add penalty if center tile is not empty
+    if (state[1][1] != 0) {
+        sequence_score += 1;
+    }
+
+    return manhattan + 3 * sequence_score;
+}
+
 vector<Node*> generateChildren(Node* current, const vector<vector<int>>& goal, string heuristic) {
 
     vector<Node*> children;
@@ -186,7 +255,7 @@ vector<Node*> generateChildren(Node* current, const vector<vector<int>>& goal, s
             vector<vector<int>> new_state = current->state;
             swap(new_state[zero_x][zero_y], new_state[new_x][new_y]);
 
-            int new_h = (heuristic == "h1") ? h1(new_state, goal) : (heuristic == "h2") ? h2(new_state, goal) : h3(new_state, goal);
+            int new_h = (heuristic == "h1") ? h1(new_state, goal) : (heuristic == "h2") ? h2(new_state, goal) : (heuristic == "h3") ? h3(new_state, goal) : h4(new_state, goal);
 
             // assign each child a f (n) -value. -- This is done in constructor of Node 
             Node* child = new Node(new_state, current->g + 1, new_h, current);
@@ -210,7 +279,7 @@ SearchResult  AStarSearch(const vector<vector<int>>& initial, const vector<vecto
         vector<Node*> all_nodes;
         int nodesExpanded = 0, nodesGenerated = 1, skipCount = 0;
 
-        int h_root = (heuristic == "h1") ? h1(initial, goal) : (heuristic == "h2") ? h2(initial, goal) : h3(initial, goal);
+        int h_root = (heuristic == "h1") ? h1(initial, goal) : (heuristic == "h2") ? h2(initial, goal) : (heuristic == "h3") ? h3(initial, goal) : h4(initial, goal);
         Node* root = new Node(initial, 0, h_root);
 
         all_nodes.push_back(root);
@@ -310,82 +379,117 @@ int main()
     // ANSI escape codes
     cout << "\x1b[1;31m\n\nWelcome to A* Search Simulator\n\n\x1b[0m" << endl;
     bool run = true;
-    while(run){
+    while (run)
+    {
 
         vector<vector<int>> goal = {{1, 2, 3}, {8, 0, 4}, {7, 6, 5}};
-    vector<vector<int>> init = {{2, 8, 3}, {1, 6, 4}, {0, 7, 5}};
-    vector<vector<int>> init2 = {{2, 1, 6}, {4, 0, 8}, {7, 5, 3}};
+        vector<vector<int>> init = {{2, 8, 3}, {1, 6, 4}, {0, 7, 5}};
+        vector<vector<int>> init2 = {{2, 1, 6}, {4, 0, 8}, {7, 5, 3}};
 
-    vector<SearchResult> results_init1;
-    vector<SearchResult> results_init2;
+        vector<SearchResult> results_init1;
+        vector<SearchResult> results_init2;
 
-    // First initial state runs
-    cout << "Running h1...\n\n" << endl;
-    SearchResult result = AStarSearch(init, goal, "h1");
-    results_init1.push_back(result);
-    for (auto& state : result.path) printState(state);
+        // First initial state runs
+        cout << "Running h1...\n\n"
+             << endl;
+        SearchResult result = AStarSearch(init, goal, "h1");
+        results_init1.push_back(result);
+        for (auto &state : result.path)
+            printState(state);
 
-    cout << "Running h2...\n\n" << endl;
-    result = AStarSearch(init, goal, "h2");
-    results_init1.push_back(result);
-    for (auto& state : result.path) printState(state);
+        cout << "Running h2...\n\n"
+             << endl;
+        result = AStarSearch(init, goal, "h2");
+        results_init1.push_back(result);
+        for (auto &state : result.path)
+            printState(state);
 
-    cout << "Running h3...\n\n" << endl;
-    result = AStarSearch(init, goal, "h3");
-    results_init1.push_back(result);
-    for (auto& state : result.path) printState(state);
+        cout << "Running h3...\n\n"
+             << endl;
+        result = AStarSearch(init, goal, "h3");
+        results_init1.push_back(result);
+        for (auto &state : result.path)
+            printState(state);
 
-    // Second initial state runs
-    cout << "\n\nSecond Initial State Run\n\n" << endl;
-    cout << "Running h1...\n\n" << endl;
-    result = AStarSearch(init2, goal, "h1");
-    results_init2.push_back(result);
-    for (auto& state : result.path) printState(state);
+        cout << "Running h4...\n\n"
+             << endl;
+        result = AStarSearch(init, goal, "h4");
+        results_init1.push_back(result);
+        for (auto &state : result.path)
+            printState(state);
 
-    cout << "Running h2...\n\n" << endl;
-    result = AStarSearch(init2, goal, "h2");
-    results_init2.push_back(result);
-    for (auto& state : result.path) printState(state);
+        // Second initial state runs
+        cout << "\n\nSecond Initial State Run\n\n"
+             << endl;
+        cout << "Running h1...\n\n"
+             << endl;
+        result = AStarSearch(init2, goal, "h1");
+        results_init2.push_back(result);
+        for (auto &state : result.path)
+            printState(state);
 
-    cout << "Running h3...\n\n" << endl;
-    result = AStarSearch(init2, goal, "h3");
-    results_init2.push_back(result);
-    for (auto& state : result.path) printState(state);
+        cout << "Running h2...\n\n"
+             << endl;
+        result = AStarSearch(init2, goal, "h2");
+        results_init2.push_back(result);
+        for (auto &state : result.path)
+            printState(state);
 
-    // Print tables for initial state #1
-    cout << "\n\nTable 1\n" << endl;
-    cout << "Initial State #1:\n" << endl;
-    cout << "Heuristic Function\tET (ms)\tNG\tNE\tD\tb*" << endl;
+        cout << "Running h3...\n\n"
+             << endl;
+        result = AStarSearch(init2, goal, "h3");
+        results_init2.push_back(result);
+        for (auto &state : result.path)
+            printState(state);
 
-    for (auto& res : results_init1) {
-        cout << res.metrics.heuristic << "\t\t\t"
-             << res.metrics.ET << "\t"
-             << res.metrics.NG << "\t"
-             << res.metrics.NE << "\t"
-             << res.metrics.D << "\t"
-             << res.metrics.b_star << endl;
-    }
+        cout << "Running h4...\n\n"
+             << endl;
+        result = AStarSearch(init2, goal, "h4");
+        results_init2.push_back(result);
+        for (auto &state : result.path)
+            printState(state);
 
+        // Print tables for initial state #1
+        cout << "\n\nTable 1\n"
+             << endl;
+        cout << "Initial State #1:\n"
+             << endl;
+        cout << "Heuristic Function\tET (ms)\tNG\tNE\tD\tb*" << endl;
 
-    // Print tables for initial state #2
-    cout << "\n\nTable 2\n" << endl;
-    cout << "Initial State #2:\n" << endl;
-    cout << "Heuristic Function\tET (ms)\tNG\tNE\tD\tb*" << endl;
+        for (auto &res : results_init1)
+        {
+            cout << res.metrics.heuristic << "\t\t\t"
+                 << res.metrics.ET << "\t"
+                 << res.metrics.NG << "\t"
+                 << res.metrics.NE << "\t"
+                 << res.metrics.D << "\t"
+                 << res.metrics.b_star << endl;
+        }
 
-    for (auto& res : results_init2) {
-        cout << res.metrics.heuristic << "\t\t\t"
-             << res.metrics.ET << "\t"
-             << res.metrics.NG << "\t"
-             << res.metrics.NE << "\t"
-             << res.metrics.D << "\t"
-             << res.metrics.b_star << endl;
-    }
+        // Print tables for initial state #2
+        cout << "\n\nTable 2\n"
+             << endl;
+        cout << "Initial State #2:\n"
+             << endl;
+        cout << "Heuristic Function\tET (ms)\tNG\tNE\tD\tb*" << endl;
+
+        for (auto &res : results_init2)
+        {
+            cout << res.metrics.heuristic << "\t\t\t"
+                 << res.metrics.ET << "\t"
+                 << res.metrics.NG << "\t"
+                 << res.metrics.NE << "\t"
+                 << res.metrics.D << "\t"
+                 << res.metrics.b_star << endl;
+        }
 
         cout << "\nPress ENTER to run again. Press Q to quit...";
         string userInput;
-        cin.get();
+        // cin.get();
         getline(cin, userInput);
-        if (userInput == "Q" || userInput == "q") {
+
+        if (userInput == "Q" || userInput == "q")
+        {
             cout << "Exiting..." << endl;
             run = false;
         }
@@ -393,6 +497,3 @@ int main()
 
     return 0;
 }
-
-
-
