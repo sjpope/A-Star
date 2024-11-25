@@ -82,6 +82,8 @@ int h1(vector<vector<int>> state, vector<vector<int>> goal){
             }
         }
     }
+
+    return count;
 }
 
 int h2(vector<vector<int>> state, vector<vector<int>> goal){
@@ -105,6 +107,8 @@ int h2(vector<vector<int>> state, vector<vector<int>> goal){
             }
         }
     }
+
+    return sum;
 }
 
 int h3(vector<vector<int>> state, vector<vector<int>> goal){
@@ -231,18 +235,16 @@ int h4(const vector<vector<int>>& state, const vector<vector<int>>& goal) {
 
     return manhattan + 3 * sequence_score;
 }
-
 vector<Node*> generateChildren(Node* current, const vector<vector<int>>& goal, string heuristic) {
 
     vector<Node*> children;
-    size_t zero_x, zero_y;
+    int zero_x = -1, zero_y = -1;
     // Find the zero (empty space) in the puzzle
-    for (size_t i = 0; i < 3; i++) {
-        for (size_t j = 0; j < 3; j++) {
+    for (int i = 0; i < 3 && zero_x == -1; i++) {
+        for (int j = 0; j < 3 && zero_x == -1; j++) {
             if (current->state[i][j] == 0) {
                 zero_x = i;
                 zero_y = j;
-                break;
             }
         }
     }
@@ -252,17 +254,28 @@ vector<Node*> generateChildren(Node* current, const vector<vector<int>>& goal, s
 
     for (auto& dir : directions) {
 
-        size_t new_x = zero_x + dir.first;
-        size_t new_y = zero_y + dir.second;
+        int new_x = zero_x + dir.first;
+        int new_y = zero_y + dir.second;
 
         if (new_x >= 0 && new_x < 3 && new_y >= 0 && new_y < 3) {
 
             vector<vector<int>> new_state = current->state;
             swap(new_state[zero_x][zero_y], new_state[new_x][new_y]);
 
-            int new_h = (heuristic == "h1") ? h1(new_state, goal) : (heuristic == "h2") ? h2(new_state, goal) : (heuristic == "h3") ? h3(new_state, goal) : h4(new_state, goal);
+            int new_h;
+            if (heuristic == "h1") {
+                new_h = h1(new_state, goal);
+            } else if (heuristic == "h2") {
+                new_h = h2(new_state, goal);
+            } else if (heuristic == "h3") {
+                new_h = h3(new_state, goal);
+            } else if (heuristic == "h4") {
+                new_h = h4(new_state, goal);
+            } else {
+                throw invalid_argument("Unknown heuristic function");
+            }
 
-            // assign each child a f (n) -value. -- This is done in constructor of Node 
+            // Assign each child an f(n) value
             Node* child = new Node(new_state, current->g + 1, new_h, current);
             children.push_back(child);
         }
@@ -270,7 +283,8 @@ vector<Node*> generateChildren(Node* current, const vector<vector<int>>& goal, s
     return children;
 }
 
-SearchResult  AStarSearch(const vector<vector<int>>& initial, const vector<vector<int>>& goal, string heuristic) {
+
+SearchResult AStarSearch(const vector<vector<int>>& initial, const vector<vector<int>>& goal, string heuristic) {
     auto start = high_resolution_clock::now();
 
     SearchResult result;
@@ -278,52 +292,56 @@ SearchResult  AStarSearch(const vector<vector<int>>& initial, const vector<vecto
     Metrics metrics;
 
     try {
-        priority_queue<pair<int, Node*>, vector<pair<int, Node*>>, greater<pair<int, Node*>>> open; // Make sure this takes the node with the lowest f value
-        
+        // Priority queue: min-heap based on f(n)
+        priority_queue<pair<int, Node*>, vector<pair<int, Node*>>, std::greater<pair<int, Node*>>> open;
+
+        // Closed set to keep track of explored states
         unordered_set<vector<vector<int>>, vector_hash> closed;
+
+        // Vector to keep track of all nodes for memory management
         vector<Node*> all_nodes;
-        int nodesExpanded = 0, nodesGenerated = 1, skipCount = 0;
 
-        int h_root = (heuristic == "h1") ? h1(initial, goal) : (heuristic == "h2") ? h2(initial, goal) : (heuristic == "h3") ? h3(initial, goal) : h4(initial, goal);
+        // Initialize metrics
+        int local_nodesExpanded = 0, local_nodesGenerated = 1, local_skipCount = 0;
+
+        // Calculate heuristic for the root node
+        int h_root = (heuristic == "h1") ? h1(initial, goal) :
+                     (heuristic == "h2") ? h2(initial, goal) :
+                     (heuristic == "h3") ? h3(initial, goal) :
+                     h4(initial, goal);
+
+        // Create the root node
         Node* root = new Node(initial, 0, h_root);
-
         all_nodes.push_back(root);
         open.emplace(root->f, root);
 
         while (!open.empty()) {
             Node* current = open.top().second;
             open.pop();
-            nodesExpanded++;
+            local_nodesExpanded++;
 
-            // if X = goal then return the path from Start to X
+            // Check if the current state is the goal
             if (current->state == goal) {
                 auto end = high_resolution_clock::now();
-                // milliseconds ET = duration_cast<milliseconds>(end - start);
-
-                duration<double> elapsed_seconds = end - start;
                 double ET = duration<double, std::milli>(end - start).count();
 
                 int D = current->g; // Depth of the tree
-                double b_star = static_cast<double>(nodesGenerated) / D; // Effective branching factor
+                double b_star = static_cast<double>(local_nodesGenerated) / D; // Effective branching factor
 
                 // Populate metrics
                 metrics.heuristic = heuristic;
                 metrics.ET = ET;
-                metrics.NG = nodesGenerated;
-                metrics.NE = nodesExpanded;
+                metrics.NG = local_nodesGenerated;
+                metrics.NE = local_nodesExpanded;
                 metrics.D = D;
                 metrics.b_star = b_star;
 
+                // Reconstruct the path from goal to start
                 while (current != nullptr) {
                     path.push_back(current->state);
                     current = current->parent;
                 }
                 reverse(path.begin(), path.end());
-
-                cout << "Path found for " << heuristic << endl;
-                cout << "Nodes generated: " << nodesGenerated << endl;
-                cout << "Nodes expanded: " << nodesExpanded << endl;
-                cout << "Nodes skipped: " << skipCount << endl;
 
                 // Clean up memory
                 for (Node* node : all_nodes) delete node;
@@ -333,40 +351,36 @@ SearchResult  AStarSearch(const vector<vector<int>>& initial, const vector<vecto
                 return result;
             }
 
-            // generate children of X.
+            // Add current state to the closed set
+            closed.insert(current->state);
+
+            // Generate all possible children from the current state
             vector<Node*> children = generateChildren(current, goal, heuristic);
 
             for (Node* child : children) {
-
-                // discard children of X if already on open or closed. 
-                if (current->parent != nullptr && child->state == current->parent->state) {
-                    skipCount++;
+                // If the child state is already in the closed set, skip it
+                if (closed.find(child->state) != closed.end()) {
+                    local_skipCount++;
                     delete child;
                     continue;
                 }
 
-                if (closed.find(child->state) != closed.end()) {
-                    skipCount++;
-                    delete child;
-                    continue;
-                } 
-                
+                // Add child to the open list
                 open.emplace(child->f, child);
                 all_nodes.push_back(child);
-                nodesGenerated++;
+                local_nodesGenerated++;
             }
-
-            closed.insert(current->state);
         }
 
-        // If no solution found
+        // If no solution is found
         cout << "No solution found for " << heuristic << endl;
         for (Node* node : all_nodes) delete node;
-        
+
     } catch (const exception& e) {
         cerr << "An error occurred: " << e.what() << endl;
     }
 
+    // If the goal was not reached, return an empty path and default metrics
     result.path = {};
     result.metrics = metrics;
     return result;
@@ -384,6 +398,7 @@ int main()
     // ANSI escape codes
     cout << "\x1b[1;31m\n\nWelcome to A* Search Simulator\n\n\x1b[0m" << endl;
     bool run = true;
+    int runCount = 1;
     while (run)
     {
 
@@ -393,6 +408,8 @@ int main()
 
         vector<SearchResult> results_init1;
         vector<SearchResult> results_init2;
+
+        cout << "Run #" << runCount++ << "\n\n\n";
 
         // First initial state runs
         cout << "Running h1...\n\n"
